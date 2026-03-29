@@ -7,7 +7,7 @@ services:
     container_name: tbi-tp2-app
     restart: unless-stopped
     expose:
-      - "8000"
+      - "8000:8000"
     volumes:
       - ./collection:/app/collection:ro
       - ./index:/app/index
@@ -26,7 +26,7 @@ services:
   nginx:
     image: nginx:1.25-alpine
     container_name: tbi-tp2-nginx
-    restart: unless-stopped
+    restart: always
     ports:
       - "80:80"
       - "443:443"

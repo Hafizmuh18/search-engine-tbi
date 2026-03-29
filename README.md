@@ -5,8 +5,11 @@ Implements BSBI/SPIMI indexing, multiple compression codecs, BM25/TF-IDF/WAND/LS
 query expansion, rank fusion, and a full evaluation suite — all accessible through one unified CLI.
 
 > **Nama**: Muhammad Hafiz
+
 > **NPM**: 2206082732
+
 > **Course**: Teknologi Basis Informasi (TBI) — Tugas Pemrograman 2  
+
 > **Faculty**: Fasilkom UI
 
 > **Website**: https://tbi-tp2.hafizmuh.site/
@@ -601,6 +604,3 @@ consistent with natural-language English text.
 - Broder et al. — *Efficient query evaluation using a two-level retrieval process* (WAND, 2003)
 - Deerwester et al. — *Indexing by Latent Semantic Analysis* (1990)
 - Cormack, Clarke & Buettcher — *Reciprocal Rank Fusion outperforms Condorcet* (2009)
-- Elias — *Universal codeword sets and representations of the integers* (1975)
-- Morrison — *PATRICIA — Practical Algorithm To Retrieve Information Coded In Alphanumeric* (1968)
-- Haldar & Mukhopadhyay — *Pseudo-Relevance Feedback and Query Expansion*

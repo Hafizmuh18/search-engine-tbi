@@ -1,0 +1,67 @@
+name: Manual — Rebuild Index / Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Aksi yang akan dijalankan"
+        required: true
+        type: choice
+        options:
+          - rebuild-index
+          - rebuild-lsi
+          - rebuild-index-and-lsi
+          - rollback
+      rollback_commit:
+        description: "Commit SHA untuk rollback (hanya untuk action=rollback)"
+        required: false
+        type: string
+
+jobs:
+  manual:
+    name: "${{ github.event.inputs.action }}"
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Execute on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key:      ${{ secrets.VPS_SSH_KEY }}
+          port:     ${{ secrets.VPS_PORT || 22 }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd ~/tbi-tp2
+            ACTION="${{ github.event.inputs.action }}"
+
+            if [ "$ACTION" = "rollback" ]; then
+              COMMIT="${{ github.event.inputs.rollback_commit }}"
+              if [ -z "$COMMIT" ]; then
+                echo "✗ rollback_commit harus diisi"
+                exit 1
+              fi
+              echo "▶ Rolling back to $COMMIT..."
+              git fetch origin
+              git checkout "$COMMIT"
+              docker compose build app
+              docker compose up -d --no-deps app
+              echo "✓ Rolled back to $COMMIT"
+              exit 0
+            fi
+
+            if [ "$ACTION" = "rebuild-index" ] || [ "$ACTION" = "rebuild-index-and-lsi" ]; then
+              echo "▶ Rebuilding inverted index..."
+              docker compose run --rm app python search_cli.py index
+            fi
+
+            if [ "$ACTION" = "rebuild-lsi" ] || [ "$ACTION" = "rebuild-index-and-lsi" ]; then
+              echo "▶ Rebuilding LSI model..."
+              docker compose run --rm app python search_cli.py lsi build
+            fi
+
+            echo "▶ Restarting app..."
+            docker compose restart app
+            echo "✓ Done: $ACTION"

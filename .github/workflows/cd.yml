@@ -1,0 +1,77 @@
+name: CD — Deploy to VPS
+
+on:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python test_suite.py --unit
+
+  deploy:
+    name: Deploy to tbi-tp2.hafizmuh.site
+    runs-on: ubuntu-latest
+    needs: [test]
+    environment:
+      name: production
+      url: https://tbi-tp2.hafizmuh.site
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key:      ${{ secrets.VPS_SSH_KEY }}
+          port:     ${{ secrets.VPS_PORT || 22 }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd ~/tbi-tp2
+
+            echo "▶ [1/6] Pulling latest code..."
+            git pull origin main
+
+            echo "▶ [2/6] Building new app image..."
+            docker compose build app
+
+            echo "▶ [3/6] Rebuilding inverted index..."
+            docker compose run --rm app python search_cli.py index
+
+            echo "▶ [4/6] Rebuilding LSI model..."
+            docker compose run --rm app python search_cli.py lsi build
+
+            echo "▶ [5/6] Restarting app container..."
+            docker compose up -d --no-deps app
+
+            echo "▶ [6/6] Waiting for app to be healthy..."
+            for i in $(seq 1 12); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' tbi-tp2-app 2>/dev/null || echo "starting")
+              echo "  attempt $i/12 — status: $STATUS"
+              if [ "$STATUS" = "healthy" ]; then
+                echo "✓ App is healthy"
+                break
+              fi
+              if [ "$i" = "12" ]; then
+                echo "✗ App did not become healthy in time"
+                docker compose logs app --tail 30
+                exit 1
+              fi
+              sleep 5
+            done
+
+            docker compose exec nginx nginx -s reload
+            echo "✓ Deploy complete → https://tbi-tp2.hafizmuh.site"

@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IR Search Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,300&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0e0f14;
+  --bg2:       #13151e;
+  --bg3:       #1a1d28;
+  --border:    #252836;
+  --border2:   #2f3347;
+  --gold:      #c9a94b;
+  --gold2:     #e8c96a;
+  --gold-dim:  #7a6430;
+  --text:      #cdd0dc;
+  --text2:     #8a8fa8;
+  --text3:     #565b72;
+  --green:     #4eca8b;
+  --red:       #e05c5c;
+  --blue:      #5b8dee;
+  --radius:    6px;
+  --mono:      'DM Mono', 'Courier New', monospace;
+  --serif:     'Fraunces', Georgia, serif;
+}
+
+html { font-size: 15px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Noise texture overlay ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Layout ── */
+.shell {
+  position: relative; z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  width: 100%;
+}
+
+/* ── Header ── */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 28px 0 22px;
+  margin-bottom: 36px;
+}
+header .shell { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+
+.logo {
+  font-family: var(--serif);
+  font-size: 1.9rem;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.logo span { color: var(--text3); font-weight: 300; font-style: italic; }
+
+.status-bar {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--text3);
+}
+.status-bar .dot {
+  display: inline-block; width: 7px; height: 7px;
+  border-radius: 50%; margin-right: 5px;
+  vertical-align: middle;
+}
+.dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot.red   { background: var(--red); }
+.dot.amber { background: var(--gold); box-shadow: 0 0 6px var(--gold-dim); }
+
+/* ── Main grid ── */
+.main { display: grid; grid-template-columns: 1fr 320px; gap: 28px; padding-bottom: 60px; }
+@media (max-width: 860px) { .main { grid-template-columns: 1fr; } }
+
+/* ── Search panel ── */
+.search-panel { display: flex; flex-direction: column; gap: 20px; }
+
+.search-box {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.search-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--gold-dim);
+  margin-bottom: 10px;
+}
+
+.input-row {
+  display: flex; gap: 8px;
+}
+
+.query-input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.query-input::placeholder { color: var(--text3); }
+.query-input:focus { border-color: var(--gold-dim); }
+
+.btn {
+  background: var(--gold);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  padding: 11px 20px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: background 0.15s, transform 0.1s;
+  white-space: nowrap;
+}
+.btn:hover  { background: var(--gold2); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { background: var(--border2); color: var(--text3); cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  padding: 6px 14px;
+  font-size: 0.75rem;
+}
+.btn-ghost:hover { border-color: var(--gold-dim); color: var(--gold); background: transparent; }
+
+/* Options row */
+.options-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+  align-items: center;
+}
+
+.select-wrap { position: relative; }
+.select-wrap select {
+  appearance: none;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 7px 28px 7px 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.select-wrap select:focus { border-color: var(--gold-dim); }
+.select-wrap::after {
+  content: '▾';
+  position: absolute; right: 9px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text3); font-size: 0.7rem;
+  pointer-events: none;
+}
+
+.k-input {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  width: 64px;
+  outline: none;
+  text-align: center;
+}
+.k-input:focus { border-color: var(--gold-dim); }
+
+.options-label { font-size: 0.72rem; color: var(--text3); }
+
+/* Tab bar */
+.tab-bar {
+  display: flex; gap: 2px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px;
+}
+.tab {
+  flex: 1; text-align: center;
+  padding: 7px 6px;
+  font-size: 0.72rem;
+  color: var(--text3);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  user-select: none;
+  letter-spacing: 0.03em;
+}
+.tab:hover  { color: var(--text2); }
+.tab.active { background: var(--bg3); color: var(--gold); }
+
+/* ── Results ── */
+.results-wrap { display: flex; flex-direction: column; gap: 10px; min-height: 80px; }
+
+.results-meta {
+  display: flex; gap: 14px; align-items: center;
+  font-size: 0.72rem; color: var(--text3);
+  padding: 6px 0;
+}
+.results-meta .highlight { color: var(--gold); }
+
+.result-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 0 14px;
+  align-items: start;
+  transition: border-color 0.15s;
+  animation: fadeUp 0.2s ease both;
+}
+.result-card:hover { border-color: var(--border2); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.result-rank {
+  font-size: 0.7rem;
+  color: var(--text3);
+  padding-top: 2px;
+  text-align: right;
+}
+.result-rank.top3 { color: var(--gold-dim); }
+
+.result-body { display: flex; flex-direction: column; gap: 3px; }
+
+.result-docid {
+  font-size: 0.88rem;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.result-path {
+  font-size: 0.68rem;
+  color: var(--text3);
+}
+
+.result-score {
+  font-size: 0.75rem;
+  color: var(--text3);
+  white-space: nowrap;
+  padding-top: 2px;
+  text-align: right;
+}
+.result-score .score-val { color: var(--green); }
+
+/* Score bar */
+.score-bar-wrap { margin-top: 5px; height: 2px; background: var(--border); border-radius: 2px; }
+.score-bar { height: 100%; background: var(--gold-dim); border-radius: 2px; transition: width 0.4s ease; }
+
+/* Compare view */
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.compare-col {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.compare-col-header {
+  background: var(--bg3);
+  padding: 8px 12px;
+  font-size: 0.72rem;
+  color: var(--gold-dim);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between;
+}
+.compare-col-header .col-ms { color: var(--text3); font-size: 0.68rem; }
+.compare-item {
+  padding: 7px 12px;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; gap: 8px;
+  transition: background 0.1s;
+}
+.compare-item:last-child { border-bottom: none; }
+.compare-item:hover { background: var(--bg3); }
+.compare-item .ci-rank { color: var(--text3); flex-shrink: 0; }
+.compare-item .ci-doc  { color: var(--text); }
+.compare-item .ci-score { color: var(--green); flex-shrink: 0; font-size: 0.68rem; }
+
+/* Expansion notice */
+.expansion-notice {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--gold-dim);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  color: var(--text2);
+  animation: fadeUp 0.2s ease;
+}
+.expansion-notice strong { color: var(--gold); }
+
+/* Empty / error / loading */
+.empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 0.82rem;
+  font-style: italic;
+}
+.error-msg {
+  background: #1e1010;
+  border: 1px solid #3d1a1a;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  color: var(--red);
+  font-size: 0.82rem;
+}
+.loading {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--text3); font-size: 0.82rem; padding: 20px 0;
+}
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Sidebar ── */
+.sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+.side-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.side-card-header {
+  background: var(--bg3);
+  padding: 9px 14px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.side-card-body { padding: 14px; }
+
+/* Stat row */
+.stat-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-label { color: var(--text3); }
+.stat-val   { color: var(--text); font-weight: 500; }
+.stat-val.gold { color: var(--gold); }
+
+/* Difficulty meter */
+.diff-meter {
+  margin: 10px 0 6px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.diff-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.diff-easy   { background: var(--green); }
+.diff-medium { background: var(--gold); }
+.diff-hard   { background: var(--red); }
+
+.diff-label {
+  font-size: 0.72rem;
+  display: flex; justify-content: space-between;
+}
+
+/* Related terms */
+.related-list { display: flex; flex-direction: column; gap: 4px; }
+.related-item {
+  display: flex; justify-content: space-between;
+  font-size: 0.78rem;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 0.1s;
+}
+.related-item:last-child { border-bottom: none; }
+.related-item:hover .ri-term { color: var(--gold); }
+.ri-term  { color: var(--text2); }
+.ri-score { color: var(--text3); font-size: 0.7rem; }
+
+/* Prefix search */
+.prefix-input-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.prefix-input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  outline: none;
+}
+.prefix-input:focus { border-color: var(--gold-dim); }
+.prefix-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.prefix-tag {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  color: var(--text2);
+  cursor: pointer;
+  transition: border-color 0.1s, color 0.1s;
+}
+.prefix-tag:hover { border-color: var(--gold-dim); color: var(--gold); }
+
+/* Zipf badge */
+.zipf-badge {
+  display: inline-block;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  color: var(--green);
+}
+
+/* Method badges in result meta */
+.method-badge {
+  display: inline-block;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 2px 7px;
+  font-size: 0.68rem;
+  color: var(--text3);
+  letter-spacing: 0.03em;
+}
+
+/* ── Footer ── */
+footer {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding: 14px 0;
+}
+footer .shell {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.68rem; color: var(--text3); flex-wrap: wrap; gap: 8px;
+}
+footer a { color: var(--gold-dim); text-decoration: none; }
+footer a:hover { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────── -->
+<header>
+  <div class="shell">
+    <div class="logo">IR<span>engine</span></div>
+    <div class="status-bar" id="statusBar">
+      <span><span class="dot red" id="dotIndex"></span><span id="lblIndex">loading…</span></span>
+      <span><span class="dot red" id="dotLsi"></span><span id="lblLsi">lsi: —</span></span>
+      <span id="lblDocs" style="color:var(--text3)">—</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Body ───────────────────────────────────────────────── -->
+<div class="shell">
+<div class="main">
+
+  <!-- Left: search + results -->
+  <div class="search-panel">
+
+    <!-- Search box -->
+    <div class="search-box">
+      <div class="search-label">Query</div>
+      <div class="input-row">
+        <input class="query-input" id="queryInput"
+               type="text" placeholder="e.g. lipid metabolism in toxemia…"
+               autocomplete="off" spellcheck="false" />
+        <button class="btn" id="searchBtn" onclick="doSearch()">Search</button>
+      </div>
+
+      <div class="options-row">
+        <span class="options-label">method</span>
+        <div class="select-wrap">
+          <select id="methodSelect">
+            <option value="bm25">bm25</option>
+            <option value="tfidf">tfidf</option>
+            <option value="wand">wand</option>
+            <option value="lsi">lsi</option>
+            <option value="prf+bm25">prf+bm25</option>
+            <option value="cooc+bm25">cooc+bm25</option>
+            <option value="rrf">rrf</option>
+            <option value="condorcet">condorcet</option>
+            <option value="combmnz">combmnz</option>
+          </select>
+        </div>
+        <span class="options-label">k</span>
+        <input class="k-input" id="kInput" type="number" value="10" min="1" max="1000" />
+        <button class="btn btn-ghost" onclick="doCompare()">compare all</button>
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <div class="tab active" id="tabResults" onclick="switchTab('results')">results</div>
+      <div class="tab" id="tabCompare" onclick="switchTab('compare')">compare</div>
+    </div>
+
+    <!-- Results area -->
+    <div id="resultsWrap" class="results-wrap">
+      <div class="empty">Enter a query above to search the collection.</div>
+    </div>
+
+  </div><!-- /search-panel -->
+
+  <!-- Right: sidebar -->
+  <div class="sidebar">
+
+    <!-- Index stats -->
+    <div class="side-card">
+      <div class="side-card-header">Index</div>
+      <div class="side-card-body" id="indexStats">
+        <div class="stat-row"><span class="stat-label">documents</span><span class="stat-val" id="statDocs">—</span></div>
+        <div class="stat-row"><span class="stat-label">vocabulary</span><span class="stat-val" id="statTerms">—</span></div>
+        <div class="stat-row"><span class="stat-label">tokens</span><span class="stat-val" id="statTokens">—</span></div>
+        <div class="stat-row"><span class="stat-label">hapax ratio</span><span class="stat-val" id="statHapax">—</span></div>
+        <div class="stat-row"><span class="stat-label">zipf α</span><span class="stat-val gold" id="statZipf">—</span></div>
+        <div class="stat-row"><span class="stat-label">lsi dims</span><span class="stat-val" id="statLsi">—</span></div>
+      </div>
+    </div>
+
+    <!-- Query difficulty -->
+    <div class="side-card">
+      <div class="side-card-header">
+        <span>Query Difficulty</span>
+        <span id="difficultyLabel" style="color:var(--text3); font-size:0.68rem"></span>
+      </div>
+      <div class="side-card-body">
+        <div class="diff-meter"><div class="diff-bar" id="diffBar" style="width:0%"></div></div>
+        <div class="diff-label">
+          <span style="color:var(--green)">easy</span>
+          <span id="diffSpec" style="color:var(--text3)">—</span>
+          <span style="color:var(--red)">hard</span>
+        </div>
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:3px;" id="diffTerms"></div>
+      </div>
+    </div>
+
+    <!-- Related terms (LSI) -->
+    <div class="side-card" id="relatedCard">
+      <div class="side-card-header">
+        <span>Semantic Neighbors</span>
+        <span id="relatedCardBadge" style="font-size:0.65rem;color:var(--text3)">via LSI</span>
+      </div>
+      <div class="side-card-body">
+        <div class="prefix-input-row">
+          <input class="prefix-input" id="relatedInput" type="text"
+                 placeholder="term…" autocomplete="off" />
+          <button class="btn btn-ghost" id="relatedBtn" onclick="doRelated()">find</button>
+        </div>
+        <div class="related-list" id="relatedList">
+          <div style="color:var(--text3);font-size:0.75rem">Enter a term to find related words.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prefix search -->
+    <div class="side-card">
+      <div class="side-card-header">
+        <span>Prefix Search</span>
+        <span id="prefixCardBadge" style="font-size:0.65rem;color:var(--text3)">vocabulary</span>
+      </div>
+      <div class="side-card-body">
+        <div class="prefix-input-row">
+          <input class="prefix-input" id="prefixInput" type="text"
+                 placeholder="prot…" autocomplete="off" />
+          <button class="btn btn-ghost" onclick="doPrefix()">search</button>
+        </div>
+        <div class="prefix-tags" id="prefixTags">
+          <span style="color:var(--text3);font-size:0.72rem">Type a prefix above.</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<footer>
+  <div class="shell">
+    <span>Search Engine from Scratch — TBI Tugas Pemrograman 2</span>
+    <span>BSBI · SPIMI · BM25 · WAND · LSI · RRF</span>
+  </div>
+</footer>
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+let currentTab = 'results';
+let lastResults = [];
+let difficultyTimeout = null;
+
+// ── App state (set by loadStatus) ────────────────────────────
+let _lsiLoaded   = false;
+let _spmiLoaded  = false;
+
+// ── Startup ───────────────────────────────────────────────────
+(async () => {
+  await loadStatus();
+  await loadStats();
+  await loadZipf();
+})();
+
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+
+    _lsiLoaded  = !!d.lsi_loaded;
+    _spmiLoaded = !!d.spimi_loaded;
+
+    // Header dots
+    document.getElementById('dotIndex').className = 'dot ' + (d.index_loaded ? 'green' : 'red');
+    document.getElementById('dotLsi').className   = 'dot ' + (_lsiLoaded     ? 'amber' : 'red');
+    document.getElementById('lblIndex').textContent =
+      d.index_loaded ? `index: ${d.num_docs.toLocaleString()} docs` : 'index: not loaded';
+    document.getElementById('lblLsi').textContent =
+      _lsiLoaded ? `lsi: k=${d.lsi_components}` : 'lsi: not built';
+    document.getElementById('lblDocs').textContent =
+      d.index_loaded ? `${d.num_terms.toLocaleString()} terms` : '';
+
+    // Index stat card
+    document.getElementById('statLsi').textContent = _lsiLoaded ? `${d.lsi_components}` : '—';
+
+    // ── LSI sidebar card ──────────────────────────────────────
+    const relatedInput = document.getElementById('relatedInput');
+    const relatedBtn   = document.getElementById('relatedBtn');
+    const relatedBadge = document.getElementById('relatedCardBadge');
+    const relatedList  = document.getElementById('relatedList');
+
+    if (_lsiLoaded) {
+      relatedInput.disabled = false;
+      relatedBtn.disabled   = false;
+      relatedInput.placeholder = 'protein…';
+      relatedBadge.textContent = `k=${d.lsi_components}`;
+      relatedBadge.style.color = 'var(--gold-dim)';
+    } else {
+      relatedInput.disabled = true;
+      relatedBtn.disabled   = true;
+      relatedInput.placeholder = 'LSI not loaded';
+      relatedBadge.textContent = 'not loaded';
+      relatedBadge.style.color = 'var(--text3)';
+      relatedList.innerHTML = `
+        <div style="color:var(--text3);font-size:0.73rem;line-height:1.5">
+          LSI model not built.<br>
+          <span style="color:var(--gold-dim)">python search_cli.py lsi build</span>
+        </div>`;
+    }
+
+    // ── Prefix sidebar card ───────────────────────────────────
+    const prefixBadge = document.getElementById('prefixCardBadge');
+    const prefixTags  = document.getElementById('prefixTags');
+    if (_spmiLoaded) {
+      prefixBadge.textContent = 'Patricia Tree';
+      prefixBadge.style.color = 'var(--gold-dim)';
+    } else {
+      prefixBadge.textContent = 'linear scan';
+      prefixBadge.style.color = 'var(--text3)';
+      prefixTags.innerHTML = `
+        <span style="color:var(--text3);font-size:0.7rem">
+          BSBI index — using linear vocab scan.
+          For instant prefix search, rebuild with SPIMI.
+        </span>`;
+    }
+
+    // ── Disable LSI/PRF method options if no LSI ─────────────
+    const sel = document.getElementById('methodSelect');
+    for (const opt of sel.options) {
+      if (opt.value === 'lsi' || opt.value === 'prf+lsi') {
+        opt.disabled = !_lsiLoaded;
+        opt.text = _lsiLoaded ? opt.value : opt.value + ' (not loaded)';
+      }
+    }
+
+  } catch(e) { console.error('Status load failed', e); }
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch('/api/inspect/vocab');
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('statDocs').textContent   = d.num_docs.toLocaleString();
+    document.getElementById('statTerms').textContent  = d.vocab_size.toLocaleString();
+    document.getElementById('statTokens').textContent = d.total_tokens.toLocaleString();
+    document.getElementById('statHapax').textContent  = (d.hapax_ratio * 100).toFixed(1) + '%';
+  } catch(e) {}
+}
+
+async function loadZipf() {
+  try {
+    const r = await fetch('/api/inspect/zipf');
+    if (!r.ok) return;
+    const d = await r.json();
+    document.getElementById('statZipf').textContent =
+      `${d.alpha.toFixed(3)}  (R²=${d.r_squared.toFixed(3)})`;
+  } catch(e) {}
+}
+
+// ── Search ────────────────────────────────────────────────────
+document.getElementById('queryInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+document.getElementById('queryInput').addEventListener('input', () => {
+  clearTimeout(difficultyTimeout);
+  const q = document.getElementById('queryInput').value.trim();
+  if (q.length > 3) {
+    difficultyTimeout = setTimeout(() => updateDifficulty(q), 400);
+  }
+});
+
+async function doSearch() {
+  const query  = document.getElementById('queryInput').value.trim();
+  const method = document.getElementById('methodSelect').value;
+  const k      = parseInt(document.getElementById('kInput').value) || 10;
+  if (!query) return;
+
+  switchTab('results');
+  setLoading(true);
+  updateDifficulty(query);
+
+  try {
+    const res = await fetch('/api/search', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query, method, k}),
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.detail || 'Search failed'); return; }
+    renderResults(data);
+    lastResults = data.hits || [];
+  } catch(e) {
+    showError('Network error: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function doCompare() {
+  const query  = document.getElementById('queryInput').value.trim();
+  const k      = parseInt(document.getElementById('kInput').value) || 10;
+  if (!query) return;
+
+  switchTab('compare');
+  setLoading(true);
+
+  try {
+    const res = await fetch('/api/compare', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query, method: 'bm25', k: Math.min(k, 10)}),
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.detail || 'Compare failed'); return; }
+    renderCompare(data);
+  } catch(e) {
+    showError('Network error: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Render results ────────────────────────────────────────────
+function renderResults(data) {
+  const wrap = document.getElementById('resultsWrap');
+  if (!data.hits || data.hits.length === 0) {
+    wrap.innerHTML = `<div class="empty">No results found for <em>"${esc(data.query)}"</em>.</div>`;
+    return;
+  }
+
+  const maxScore = Math.max(...data.hits.map(h => h.score), 0.001);
+
+  let html = `<div class="results-meta">
+    <span><span class="highlight">${data.num_results}</span> results</span>
+    <span class="method-badge">${esc(data.method)}</span>
+    <span>${data.elapsed_ms} ms</span>`;
+
+  if (data.fused_methods) {
+    html += `<span class="method-badge">fused: ${esc(data.fused_methods.join('+'))}</span>`;
+  }
+  html += `</div>`;
+
+  if (data.expanded_query && data.expanded_query !== data.query) {
+    html += `<div class="expansion-notice">
+      <strong>Expanded:</strong> ${esc(data.expanded_query)}
+      ${data.expansion_terms ? `<br><strong>+terms:</strong> ${esc(data.expansion_terms.join(', '))}` : ''}
+    </div>`;
+  }
+
+  for (const hit of data.hits) {
+    const pct = Math.round((hit.score / maxScore) * 100);
+    const rankCls = hit.rank <= 3 ? 'result-rank top3' : 'result-rank';
+    const animDelay = `animation-delay:${(hit.rank - 1) * 0.03}s`;
+    html += `
+    <div class="result-card" style="${animDelay}">
+      <div class="${rankCls}">#${hit.rank}</div>
+      <div class="result-body">
+        <div class="result-docid">${esc(hit.doc_id)}</div>
+        <div class="result-path">${esc(hit.path)}</div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width:${pct}%"></div></div>
+      </div>
+      <div class="result-score"><span class="score-val">${hit.score.toFixed(4)}</span></div>
+    </div>`;
+  }
+
+  wrap.innerHTML = html;
+}
+
+function renderCompare(data) {
+  const wrap = document.getElementById('resultsWrap');
+  const methods = data.methods;
+  let html = `<div class="results-meta">
+    <span>Comparing <span class="highlight">${Object.keys(methods).length}</span> methods</span>
+    <span>query: <em>${esc(data.query)}</em></span>
+  </div>
+  <div class="compare-grid">`;
+
+  for (const [name, result] of Object.entries(methods)) {
+    if (result.error) {
+      html += `<div class="compare-col">
+        <div class="compare-col-header">${esc(name)}</div>
+        <div style="padding:10px;font-size:0.72rem;color:var(--red)">${esc(result.error)}</div>
+      </div>`;
+      continue;
+    }
+    html += `<div class="compare-col">
+      <div class="compare-col-header">
+        <span>${esc(name)}</span>
+        <span class="col-ms">${result.elapsed_ms}ms</span>
+      </div>`;
+    for (const h of (result.hits || []).slice(0, 8)) {
+      html += `<div class="compare-item">
+        <span class="ci-rank">${h.rank}</span>
+        <span class="ci-doc">${esc(h.doc_id)}</span>
+        <span class="ci-score">${h.score.toFixed(3)}</span>
+      </div>`;
+    }
+    if (result.expanded_query && result.expanded_query !== data.query) {
+      html += `<div style="padding:6px 12px;font-size:0.65rem;color:var(--gold-dim);border-top:1px solid var(--border)">
+        expanded</div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  wrap.innerHTML = html;
+}
+
+// ── Difficulty ────────────────────────────────────────────────
+async function updateDifficulty(query) {
+  try {
+    const res = await fetch('/api/difficulty', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({query}),
+    });
+    if (!res.ok) return;
+    const d = await res.json();
+
+    const spec = d.specificity || 0;
+    const bar  = document.getElementById('diffBar');
+    bar.style.width = (spec * 100) + '%';
+    bar.className = 'diff-bar ' +
+      (spec > 0.6 ? 'diff-easy' : spec > 0.3 ? 'diff-medium' : 'diff-hard');
+
+    document.getElementById('diffSpec').textContent =
+      spec.toFixed(3) + ' / 1.0';
+
+    const lbl = d.difficulty_label || '';
+    const short = lbl.startsWith('EASY') ? 'EASY' :
+                  lbl.startsWith('HARD') ? 'HARD' : 'MEDIUM';
+    const lblEl = document.getElementById('difficultyLabel');
+    lblEl.textContent = short;
+    lblEl.style.color = short === 'EASY' ? 'var(--green)' :
+                        short === 'HARD' ? 'var(--red)' : 'var(--gold)';
+
+    // Per-term mini table
+    if (d.term_data) {
+      const terms = d.term_data;
+      let th = '';
+      for (const t of terms.slice(0, 5)) {
+        th += `<div style="display:flex;justify-content:space-between;font-size:0.7rem;padding:2px 0;border-bottom:1px solid var(--border)">
+          <span style="color:var(--text2)">${esc(t.term)}</span>
+          <span style="color:var(--text3)">df=${t.df.toLocaleString()} idf=${t.idf.toFixed(2)}</span>
+        </div>`;
+      }
+      document.getElementById('diffTerms').innerHTML = th;
+    }
+  } catch(e) {}
+}
+
+// ── Related terms ─────────────────────────────────────────────
+document.getElementById('relatedInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doRelated();
+});
+
+async function doRelated() {
+  if (!_lsiLoaded) return;   // button is disabled, but guard anyway
+  const term = document.getElementById('relatedInput').value.trim();
+  if (!term) return;
+  const list = document.getElementById('relatedList');
+  list.innerHTML = `<div class="loading"><div class="spinner"></div>searching…</div>`;
+  try {
+    const res = await fetch('/api/related', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({term, k: 8}),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      list.innerHTML = `<div style="color:var(--text3);font-size:0.75rem">${esc(data.detail)}</div>`;
+      return;
+    }
+    if (!data.related || !data.related.length) {
+      list.innerHTML = `<div style="color:var(--text3);font-size:0.75rem">Term not found in vocabulary.</div>`;
+      return;
+    }
+    let html = '';
+    for (const r of data.related) {
+      html += `<div class="related-item" onclick="setRelatedQuery('${esc(r.term)}')">
+        <span class="ri-term">${esc(r.term)}</span>
+        <span class="ri-score">${r.score.toFixed(3)}</span>
+      </div>`;
+    }
+    list.innerHTML = html;
+  } catch(e) {
+    list.innerHTML = `<div style="color:var(--red);font-size:0.75rem">Error: ${e.message}</div>`;
+  }
+}
+
+// ── Prefix search ─────────────────────────────────────────────
+document.getElementById('prefixInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doPrefix();
+});
+
+async function doPrefix() {
+  const prefix = document.getElementById('prefixInput').value.trim();
+  if (!prefix) return;
+  const tags = document.getElementById('prefixTags');
+  tags.innerHTML = `<div class="loading"><div class="spinner"></div></div>`;
+  try {
+    const res = await fetch('/api/prefix', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prefix}),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      tags.innerHTML = `<span style="color:var(--red);font-size:0.72rem">${esc(data.detail)}</span>`;
+      return;
+    }
+    if (!data.matches || !data.matches.length) {
+      tags.innerHTML = `<span style="color:var(--text3);font-size:0.72rem">No matches for "${esc(prefix)}".</span>`;
+      return;
+    }
+    // Show method badge + result count
+    const methodLabel = data.method === 'patricia' ? 'Patricia Tree' : 'linear scan';
+    const methodColor = data.method === 'patricia' ? 'var(--gold-dim)' : 'var(--text3)';
+    tags.innerHTML =
+      `<span style="font-size:0.68rem;color:${methodColor};width:100%;margin-bottom:4px">
+         ${data.matches.length} match${data.matches.length !== 1 ? 'es' : ''} · ${methodLabel}
+       </span>` +
+      data.matches.map(m =>
+        `<span class="prefix-tag" onclick="setQuery('${esc(m)}')">${esc(m)}</span>`
+      ).join('');
+  } catch(e) {
+    tags.innerHTML = `<span style="color:var(--red);font-size:0.72rem">${e.message}</span>`;
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabResults').classList.toggle('active', tab === 'results');
+  document.getElementById('tabCompare').classList.toggle('active', tab === 'compare');
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('searchBtn');
+  const wrap = document.getElementById('resultsWrap');
+  btn.disabled = on;
+  if (on) {
+    wrap.innerHTML = `<div class="loading"><div class="spinner"></div>searching…</div>`;
+  }
+}
+
+function showError(msg) {
+  document.getElementById('resultsWrap').innerHTML =
+    `<div class="error-msg">⚠ ${esc(msg)}</div>`;
+}
+
+function setQuery(term) {
+  document.getElementById('queryInput').value = term;
+  doSearch();
+}
+
+function setRelatedQuery(term) {
+  // Clicking a related term: fill the query box AND the related input
+  document.getElementById('queryInput').value = term;
+  document.getElementById('relatedInput').value = term;
+  doSearch();
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>

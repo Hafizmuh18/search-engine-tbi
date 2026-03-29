@@ -1,0 +1,48 @@
+# Docker
+.dockerignore
+*.tar
+
+# Virtual environment
+env/
+venv/
+.venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Generated index (rebuild: python search_cli.py index)
+index/*.index
+index/*.dict
+
+# LSI model (rebuild: python search_cli.py lsi build)
+index/lsi_model.pkl
+
+# SPIMI spill files
+tmp/
+
+# Keep empty dirs
+!index/.gitkeep
+!tmp/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Certbot certs
+deploy/certbot/conf/
+deploy/certbot/www/
+!deploy/certbot/conf/.gitkeep
+!deploy/certbot/www/.gitkeep

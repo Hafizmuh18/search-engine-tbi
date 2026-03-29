@@ -4,8 +4,12 @@ A fully functional Information Retrieval (IR) search engine built from scratch i
 Implements BSBI/SPIMI indexing, multiple compression codecs, BM25/TF-IDF/WAND/LSI retrieval,
 query expansion, rank fusion, and a full evaluation suite — all accessible through one unified CLI.
 
+> **Nama**: Muhammad Hafiz
+> **NPM**: 2206082732
 > **Course**: Teknologi Basis Informasi (TBI) — Tugas Pemrograman 2  
 > **Faculty**: Fasilkom UI
+
+> **Website**: https://tbi-tp2.hafizmuh.site/
 
 ---
 
@@ -51,8 +55,8 @@ query expansion, rank fusion, and a full evaluation suite — all accessible thr
 
 ```bash
 # 1. Clone and enter the repo
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/Hafizmuh18/search-engine-tbi
+cd search-engine-tbi
 
 # 2. Create and activate virtual environment
 python -m venv env

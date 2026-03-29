@@ -43,7 +43,8 @@ jobs:
             cd ~/tbi-tp2
 
             echo "▶ [1/6] Pulling latest code..."
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
 
             echo "▶ [2/6] Building new app image..."
             docker compose build app
